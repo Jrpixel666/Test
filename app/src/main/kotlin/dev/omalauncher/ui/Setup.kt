@@ -214,7 +214,7 @@ private fun StartButton(
                 "Debian and its apps download about 600 MB, so Wi-Fi is best, and take 3 GB of space. They install in the " +
                     "background in 10 to 20 minutes; the home screen is ready right away."
             } else {
-                "Downloads the theme's wallpaper now and Omarchy's other themes (about 70 MB) in the background."
+                "Downloads this theme's colors and wallpaper now, a few MB. Other themes download one at a time, when you pick them."
             },
             Modifier.padding(top = 10.dp).fillMaxWidth(),
             style = Mono.copy(color = Subtle, fontSize = TextSize.Small, lineHeight = 16.sp),

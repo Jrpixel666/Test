@@ -27,6 +27,8 @@ moved from Arch Linux ARM to Debian ARM, and with its widget language
 - **Settings › tweaks:** reads the GTK, icon and cursor themes your Debian install has, sets Hyprland's gaps,
   border, rounding, animations and blur (`~/.config/hypr/tweaks.conf`), and installs theme packs (Arc,
   Numix, Orchis, Papirus, Breeze, DMZ) with apt.
+- **Themes:** the start screen and Settings › style pick one of Omarchy's color themes; only that theme's
+  colors and wallpaper download (a few MB). Omarchy's full theme pack (~70 MB) is never downloaded.
 - **Settings › packages:** search, install and remove Debian packages with apt.
 
 Needs an arm64 phone with Android 10 or newer.

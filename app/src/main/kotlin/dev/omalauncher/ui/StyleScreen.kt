@@ -89,7 +89,6 @@ import dev.omalauncher.theme.Setting
 import dev.omalauncher.theme.Style
 import dev.omalauncher.theme.StyleStore
 import dev.omalauncher.theme.ThemeDirs
-import dev.omalauncher.theme.ThemeDownload
 import dev.omalauncher.theme.ThemeStore
 import dev.omalauncher.theme.Toml
 import dev.omalauncher.widgets.WidgetEngine
@@ -296,7 +295,11 @@ private fun ThemeSection(
     }
     InstallStatus(store)
     if (!store.complete) {
-        DownloadPrompt(store.download, partial = store.themes.isNotEmpty()) { scope.launch { store.ensureRelease() } }
+        // Omarchy's full pack (~70 MB) isn't downloaded: a theme picked here fetches its colors and first wallpaper alone.
+        ThemeStrip(store, gutter = PanelPadding, onPick = { theme ->
+            store.pick(theme)
+            scope.launch { store.fetchPicked() }
+        })
         Spacer(Modifier.height(8.dp))
     }
     if (store.themes.isNotEmpty()) {
@@ -892,33 +895,6 @@ private fun StyleOption(
         }
     }
     if (selected < 0 && custom != null) OptionHint("custom: $custom, from style.toml", Modifier.padding(bottom = 4.dp))
-}
-
-@Composable
-private fun DownloadPrompt(
-    state: ThemeDownload,
-    /** Some themes are here already (first run fetches only the picked one). */
-    partial: Boolean,
-    onDownload: () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        BasicText(
-            if (partial) {
-                "Omarchy's other themes are downloading from github.com/omacom/omarchy (~70 MB)."
-            } else {
-                "Omarchy's themes aren't installed yet. They're downloaded from github.com/omacom/omarchy (~70 MB)."
-            },
-            style = Mono,
-        )
-        when (state) {
-            is ThemeDownload.Running -> BasicText("downloading… ${state.megabytes} MB", style = Mono.copy(color = Palette.accent))
-            is ThemeDownload.Failed -> {
-                BasicText("failed: ${state.message}", style = Mono.copy(color = Palette.red))
-                BracketAction("retry", Palette.accent, onClick = onDownload)
-            }
-            ThemeDownload.Idle -> BracketAction("download themes", Palette.accent, onClick = onDownload)
-        }
-    }
 }
 
 @Composable

@@ -213,17 +213,15 @@ class Runtime(
             widgets.start()
             themes.load()
             style.start()
-            // On the first-run screen the download is the screen's job, with progress.
-            if (launcherReady) scope.launch { themes.ensureRelease() }
+            // Omarchy's full theme pack (~70 MB) is never downloaded: only the picked theme, from the start screen or style.
             if (bootstrap.wanted) runLinux { bootstrap.run() } else bootstrap.run()
         }
     }
 
-    /** The start screen is done for this run; the home screen shows, while the rest of the themes download. */
+    /** The start screen is done for this run; the home screen shows. Other themes download one by one, when picked. */
     fun finishWelcome() {
         prefs.edit().putBoolean(SETUP_DONE, true).apply()
         launcherReady = true
-        scope.launch { themes.ensureRelease() }
     }
 
     /** Installs Linux in the background, with [agents]; progress shows in [Bootstrap.state] and the notification. */
