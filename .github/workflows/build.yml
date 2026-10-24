@@ -38,10 +38,10 @@ jobs:
             printf "Package: *\nPin: release n=forky\nPin-Priority: 100\n" > /etc/apt/preferences.d/testing
             apt-get update -qq
             apt-get install -s --no-install-recommends -t forky hyprland > /tmp/h.txt
-            echo "hyprland: $(grep -c "^Inst" /tmp/h.txt) packages, $(grep "^Inst" /tmp/h.txt | grep -c forky) from forky"
+            echo "hyprland: $(grep -c "^Inst" /tmp/h.txt) packages, $(grep "^Inst" /tmp/h.txt | grep -c testing) from testing"
             grep "^Inst hyprland " /tmp/h.txt
             # Nothing outside that install moves to testing.
-            apt-get dist-upgrade -s | grep "^Inst" && exit 1 || echo "dist-upgrade stays on trixie"
+            apt-get dist-upgrade -s | grep "^Inst" | grep testing && exit 1 || echo "dist-upgrade stays on trixie"
           '
 
   apk:
