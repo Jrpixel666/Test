@@ -20,12 +20,13 @@ moved from Arch Linux ARM to Debian ARM, and with its widget language
 - **No VNC:** apt pins `tigervnc-*`, `tightvncserver`, `x11vnc`, `wayvnc` and the rest to -1, so they never install.
 - **Owl:** the home screen's widgets, apps and panels are Owl programs (`app/src/main/assets/widgets`);
   `owl-check` and `owl-send` are in the guest's PATH.
-- **Hyprland:** setup installs `hyprland`, `waybar`, `wofi` and `mako`, plus a **Hyprland** entry in the
+- **Hyprland:** Debian 13 has no Hyprland, so setup installs it from Debian testing (forky), pinned so
+  nothing else moves to testing, with `waybar`, `wofi` and `mako` from trixie, plus a **Hyprland** entry in the
   app drawer that starts it nested in the launcher (`/usr/local/bin/hyprland-session`, config in
   `~/.config/hypr/hyprland.conf`).
 - **Settings › tweaks:** reads the GTK, icon and cursor themes your Debian install has, sets Hyprland's gaps,
   border, rounding, animations and blur (`~/.config/hypr/tweaks.conf`), and installs theme packs (Arc,
-  Numix, Materia, Orchis, Papirus, Breeze, DMZ) with apt.
+  Numix, Orchis, Papirus, Breeze, DMZ) with apt.
 - **Settings › packages:** search, install and remove Debian packages with apt.
 
 Needs an arm64 phone with Android 10 or newer.

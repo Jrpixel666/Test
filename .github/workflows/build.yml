@@ -18,20 +18,31 @@ jobs:
           core=$(scripts/debian-packages.py | tr '\n' ' ')
           desktop=$(scripts/debian-packages.py --desktop | tr '\n' ' ')
           packs=$(sed -n 's/.*ThemePack("\([a-z0-9.+-]*\)".*/\1/p' app/src/main/kotlin/dev/omalauncher/linux/Tweaks.kt | tr '\n' ' ')
-          docker run --rm debian:trixie bash -c "
-            set -e
+          docker run --rm -e core="$core" -e desktop="$desktop" -e packs="$packs" debian:trixie bash -euo pipefail -c '
             apt-get update -qq
-            missing=''
+            missing=""
             for p in $core $desktop $packs; do
-              apt-cache show \"\$p\" >/dev/null 2>&1 || missing=\"\$missing \$p\"
+              apt-cache show "$p" >/dev/null 2>&1 || missing="$missing $p"
             done
-            echo \"missing:\${missing:- none}\"
+            echo "missing from trixie:${missing:- none}"
+            [ -z "$missing" ] || exit 1
             # The core set installs in one apt call: it must resolve as a whole.
-            apt-get install -s --no-install-recommends $core > /tmp/core.txt
-            echo \"core: \$(grep -c '^Inst' /tmp/core.txt) packages\"
-            apt-get install -s --no-install-recommends hyprland > /tmp/hypr.txt && echo \"hyprland: \$(grep -c '^Inst' /tmp/hypr.txt) packages\"
-            for p in $core; do case \" \$missing \" in *\" \$p \"*) echo \"core package \$p is missing\" >&2; exit 1;; esac; done
-          "
+            echo "core: $(apt-get install -s --no-install-recommends $core | grep -c "^Inst") packages"
+          '
+
+      # Hyprland from testing, set up the way Bootstrap.kt's configure() does it.
+      - name: Check Hyprland from testing
+        run: |
+          docker run --rm debian:trixie bash -euo pipefail -c '
+            printf "Types: deb\nURIs: http://deb.debian.org/debian\nSuites: forky\nComponents: main\nSigned-By: /usr/share/keyrings/debian-archive-keyring.pgp\n" > /etc/apt/sources.list.d/forky.sources
+            printf "Package: *\nPin: release n=forky\nPin-Priority: 100\n" > /etc/apt/preferences.d/testing
+            apt-get update -qq
+            apt-get install -s --no-install-recommends -t forky hyprland > /tmp/h.txt
+            echo "hyprland: $(grep -c "^Inst" /tmp/h.txt) packages, $(grep "^Inst" /tmp/h.txt | grep -c forky) from forky"
+            grep "^Inst hyprland " /tmp/h.txt
+            # Nothing outside that install moves to testing.
+            apt-get dist-upgrade -s | grep "^Inst" && exit 1 || echo "dist-upgrade stays on trixie"
+          '
 
   apk:
     runs-on: ubuntu-latest

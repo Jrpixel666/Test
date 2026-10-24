@@ -13,12 +13,15 @@ fun shellQuote(s: String) = shQuote(s)
  * Installs [packages] with apt after refreshing its lists, without recommends, then drops the
  * downloaded .debs: storage on phones is tight. [refresh] is kept for callers that ask for it;
  * apt always reads fresh lists here, since a stale list names versions the mirror no longer has.
+ * [release] installs from that suite (`-t`), like testing for what stable lacks.
  */
 @Suppress("UNUSED_PARAMETER")
 fun aptInstall(
     packages: Collection<String>,
     refresh: Boolean = false,
-) = "apt-get update && apt-get install -y --no-install-recommends ${packages.joinToString(" ") { shellQuote(it) }} && $CLEAN_APT_CACHE"
+    release: String? = null,
+) = "apt-get update && apt-get install -y --no-install-recommends ${release?.let { "-t ${shellQuote(it)} " }.orEmpty()}" +
+    "${packages.joinToString(" ") { shellQuote(it) }} && $CLEAN_APT_CACHE"
 
 /**
  * Installs what it can of [packages]: all at once, or, when one of them is missing from the

@@ -78,16 +78,24 @@ private val PACKAGES =
     )
 
 /**
- * Hyprland and what it draws with, plus GTK, icon and cursor themes the tweaks screen offers.
+ * What goes with Hyprland, plus GTK, icon and cursor themes the tweaks screen offers, all from trixie.
  * Installed one by one if the batch fails, so a name a mirror lacks costs only that package.
  */
 private val DESKTOP_PACKAGES =
     listOf(
-        "hyprland", "hyprpaper", "hyprland-protocols", "xwayland", "waybar", "wofi", "mako-notifier",
-        "gnome-themes-extra", "arc-theme", "numix-gtk-theme", "materia-gtk-theme",
+        "xwayland", "waybar", "wofi", "mako-notifier",
+        "gnome-themes-extra", "arc-theme", "numix-gtk-theme",
         "adwaita-icon-theme", "papirus-icon-theme", "breeze-cursor-theme", "dmz-cursor-theme",
         "libgtk-3-bin", "gsettings-desktop-schemas", "dconf-cli",
     )
+
+/**
+ * Hyprland isn't in Debian 13; it comes from testing (forky), which apt otherwise never picks
+ * ([TESTING_PIN]). apt brings along the newer libraries it needs from there.
+ */
+private val HYPRLAND_PACKAGES = listOf("hyprland")
+
+private const val TESTING = "forky"
 
 /** Debian names the binaries of these differently; the launcher and Omarchy's configs call them by the usual names. */
 private val ALIASES = mapOf("bat" to "/usr/bin/batcat", "fd" to "/usr/bin/fdfind")
@@ -106,7 +114,9 @@ private fun sources(keyring: String?): String {
     return "Types: deb\nURIs: http://deb.debian.org/debian\nSuites: trixie trixie-updates\n" +
         "Components: main contrib non-free non-free-firmware\n$signedBy\n" +
         "Types: deb\nURIs: http://deb.debian.org/debian-security\nSuites: trixie-security\n" +
-        "Components: main contrib non-free non-free-firmware\n$signedBy"
+        "Components: main contrib non-free non-free-firmware\n$signedBy\n" +
+        "Types: deb\nURIs: http://deb.debian.org/debian\nSuites: $TESTING\n" +
+        "Components: main\n$signedBy"
 }
 
 private val KEYRINGS = listOf("/usr/share/keyrings/debian-archive-keyring.pgp", "/usr/share/keyrings/debian-archive-keyring.gpg")
@@ -152,6 +162,17 @@ private val APT_PINS =
     Package: tigervnc-* tightvncserver x11vnc* wayvnc novnc vnc4server turbovnc* realvnc-*
     Pin: release *
     Pin-Priority: -1
+    """.trimIndent() + "\n"
+
+/**
+ * Debian testing only where asked for (`-t forky`, for Hyprland), and for what that keeps current: below
+ * trixie's 500, so upgrades never move the rest of the system to testing.
+ */
+private val TESTING_PIN =
+    """
+    Package: *
+    Pin: release n=$TESTING
+    Pin-Priority: 100
     """.trimIndent() + "\n"
 
 /** Services don't start from package scripts: there's no init under proot. */
@@ -278,7 +299,8 @@ class Bootstrap(
             Step("aliases-1", Stage.Packages, "Linking bat and fd", network = false) { linkAliases() },
             Step("keymap-1", Stage.Packages, "Compiling keymap", network = false, isDone = { proot.keymap.exists() }) { compileKeymap() },
             Step("cliamp-$CLIAMP_VERSION", Stage.Packages, "Installing cliamp", network = true, optional = true) { installCliamp() },
-            Step("desktop-1", Stage.Desktop, "Installing Hyprland and themes", network = true, optional = true) { guest(aptInstallEach(DESKTOP_PACKAGES)) },
+            Step("desktop-1", Stage.Desktop, "Installing themes and Hyprland's tools", network = true, optional = true) { guest(aptInstallEach(DESKTOP_PACKAGES)) },
+            Step("hyprland-1", Stage.Desktop, "Installing Hyprland", network = true, optional = true) { guest(aptInstall(HYPRLAND_PACKAGES, release = TESTING)) },
         )
 
     private fun Step.done() = isDone?.invoke() ?: (id in journal)
@@ -711,6 +733,7 @@ class Bootstrap(
             parentFile?.mkdirs()
             writeText(APT_PINS)
         }
+        File(root, "etc/apt/preferences.d/testing").writeText(TESTING_PIN)
         File(root, "usr/sbin/policy-rc.d").apply {
             writeText(POLICY_RC)
             setExecutable(true, false)

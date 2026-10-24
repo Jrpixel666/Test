@@ -46,7 +46,6 @@ val THEME_PACKS =
         ThemePack("gnome-themes-extra", "Adwaita, HighContrast", "GNOME's GTK themes, dark ones too"),
         ThemePack("arc-theme", "Arc", "flat GTK theme with dark and darker variants"),
         ThemePack("numix-gtk-theme", "Numix", "modern flat GTK theme"),
-        ThemePack("materia-gtk-theme", "Materia", "Material Design GTK theme"),
         ThemePack("orchis-gtk-theme", "Orchis", "rounded Material-like GTK theme"),
         ThemePack("papirus-icon-theme", "Papirus", "icon theme, light and dark"),
         ThemePack("adwaita-icon-theme", "Adwaita icons", "GNOME's icons and cursor"),
