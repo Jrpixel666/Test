@@ -644,7 +644,9 @@ class LangTest {
     @Test fun requiresDeclaresPackagesPerManager() {
         val p = Compiler.compile("widget {\n  requires { pacman: [\"jq\", \"curl\"] }\n  requires { pacman: \"jq\" }\n  Text { text: \"x\" }\n}")
         assertEquals(mapOf("pacman" to listOf("jq", "curl")), p.requires)
-        assertTrue(compileError("widget { requires { brew: [\"jq\"] }\n Text { text: \"x\" } }").contains("unknown package manager 'brew' (pacman)"))
+        assertTrue(compileError("widget { requires { brew: [\"jq\"] }\n Text { text: \"x\" } }").contains("unknown package manager 'brew' (apt, pacman)"))
+        assertEquals(mapOf("apt" to listOf("fd-find", "libgtk-3-bin")), Compiler.compile("widget {\n  requires { apt: [\"fd-find\", \"libgtk-3-bin\"] }\n  Text { text: \"x\" }\n}").requires)
+        assertTrue(compileError("widget { requires { apt: [\"jq; rm -rf /\"] }\n Text { text: \"x\" } }").contains("isn't a valid apt package name"))
         // Names go into a shell command, so anything but a plain package name is refused.
         assertTrue(compileError("widget { requires { pacman: [\"jq; rm -rf /\"] }\n Text { text: \"x\" } }").contains("isn't a valid pacman package name"))
         assertTrue(compileError("widget { requires { pacman: [1] }\n Text { text: \"x\" } }").contains("package names are strings"))
