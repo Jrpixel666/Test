@@ -47,7 +47,7 @@ private const val FORK_CHECK_SECONDS = 30L
 /** Room for the download (~50 MB). */
 private const val TARBALL_SPACE = 100_000_000L
 
-/** Room for the unpacked system and what setup installs into it, Hyprland and the themes too (~2.2 GB with an agent), with some to spare. */
+/** Room for the unpacked system and what setup installs into it, Hyprland too (~2.2 GB with an agent), with some to spare. */
 private const val SYSTEM_SPACE = 2_600_000_000L
 
 /** A failure that trying again can't fix, like a full disk: a network step stops at once rather than downloading again. */
@@ -78,14 +78,12 @@ private val PACKAGES =
     )
 
 /**
- * What goes with Hyprland, plus GTK, icon and cursor themes the tweaks screen offers, all from trixie.
+ * What goes with Hyprland, from trixie. No themes: settings › tweaks installs those only when asked.
  * Installed one by one if the batch fails, so a name a mirror lacks costs only that package.
  */
 private val DESKTOP_PACKAGES =
     listOf(
         "xwayland", "waybar", "wofi", "mako-notifier",
-        "gnome-themes-extra", "arc-theme", "numix-gtk-theme",
-        "adwaita-icon-theme", "papirus-icon-theme", "breeze-cursor-theme", "dmz-cursor-theme",
         "libgtk-3-bin", "gsettings-desktop-schemas", "dconf-cli",
     )
 
@@ -189,7 +187,7 @@ enum class Stage(
     Extract("unpack the system"),
     Configure("configure apt"),
     Packages("install omarchy's apps"),
-    Desktop("install hyprland and themes"),
+    Desktop("install hyprland"),
     Agents("install coding agents"),
 }
 
@@ -299,7 +297,7 @@ class Bootstrap(
             Step("aliases-1", Stage.Packages, "Linking bat and fd", network = false) { linkAliases() },
             Step("keymap-1", Stage.Packages, "Compiling keymap", network = false, isDone = { proot.keymap.exists() }) { compileKeymap() },
             Step("cliamp-$CLIAMP_VERSION", Stage.Packages, "Installing cliamp", network = true, optional = true) { installCliamp() },
-            Step("desktop-1", Stage.Desktop, "Installing themes and Hyprland's tools", network = true, optional = true) { guest(aptInstallEach(DESKTOP_PACKAGES)) },
+            Step("desktop-1", Stage.Desktop, "Installing Hyprland's tools", network = true, optional = true) { guest(aptInstallEach(DESKTOP_PACKAGES)) },
             Step("hyprland-1", Stage.Desktop, "Installing Hyprland", network = true, optional = true) { guest(aptInstall(HYPRLAND_PACKAGES, release = TESTING)) },
         )
 
