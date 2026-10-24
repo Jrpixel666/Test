@@ -61,7 +61,7 @@ that read it redraw. Properties are separated by newlines or `;`.
 
 A file holds declarations, then the nodes it shows:
 
-- `source x = cmd("...") every 5s` runs a bash command in this Arch system, and `x` is its output (`json` parses
+- `source x = cmd("...") every 5s` runs a bash command in this Debian system, and `x` is its output (`json` parses
   it). `http("https://...")` fetches from Android, with no Linux needed; `stream`, `file` and `clock` are sources
   too, and `android.battery`, `android.media`, `android.notifications` and more read the phone.
 - `state x = 0` is a value handlers change (`persist` keeps it across restarts), and `let x = ...` a value worked

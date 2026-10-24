@@ -119,7 +119,7 @@ private fun LinuxPlaceholder(
         Spacer(Modifier.weight(1f))
         BasicText("needs Linux", style = Mono.copy(color = Palette.accent))
         BasicText(
-            "runs commands in the optional Arch Linux",
+            "runs commands in the optional Debian ARM",
             style = Mono.copy(color = Palette.muted, fontSize = TextSize.Small),
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,

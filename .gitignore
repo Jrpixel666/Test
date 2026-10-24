@@ -17,3 +17,5 @@ fastlane/README.md
 keystore.properties
 # captured by scripts/collage-captures.sh
 store/collage/raw/
+# The public test key every CI build signs with, so a newer APK installs over an older one.
+!signing/public-test.jks

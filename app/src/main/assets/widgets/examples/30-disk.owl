@@ -4,7 +4,7 @@ widget "disk" {
   size: 3x2
   minSize: 2x2
 
-  requires { pacman: ["dua-cli"] }
+  requires { apt: ["ncdu"] }
 
   source df = cmd('df -B1 --output=avail,pcent / | tail -1') every 120s
   let use = num(words(df)[1])

@@ -16,7 +16,8 @@ import dev.omalauncher.LauncherData
 import dev.omalauncher.Runtime
 import dev.omalauncher.linux.Agent
 import dev.omalauncher.linux.Proot
-import dev.omalauncher.linux.pacmanInstall
+import dev.omalauncher.linux.Apt
+import dev.omalauncher.linux.aptInstall
 import dev.omalauncher.linux.runJob
 import dev.omalauncher.ui.Palette
 import dev.omalauncher.theme.Style
@@ -707,7 +708,7 @@ class WidgetEngine(
             when {
                 program.terminal -> "Terminal tiles aren't previewed"
                 waitsForLinux(spec) -> "it needs Linux, which isn't installed"
-                !missing[name].isNullOrEmpty() -> "it needs ${missing[name]!!.joinToString(" ")}; install with pacman -S --needed"
+                !missing[name].isNullOrEmpty() -> "it needs ${missing[name]!!.joinToString(" ")}; install with apt-get install"
                 instance(spec) == null -> "it isn't running"
                 else -> null
             }
@@ -945,7 +946,7 @@ class WidgetEngine(
     }
 
     /**
-     * Checks, in one guest shell call, which declared pacman packages are
+     * Checks, in one guest shell call, which declared packages are
      * missing and which programs the commands use that aren't installed. A
      * program that's missing and undeclared is reported, so the author adds it
      * to `requires`.
@@ -953,7 +954,7 @@ class WidgetEngine(
     private suspend fun checkDependencies(specs: List<WidgetSpec>) {
         if (!linux) return
         val programs = specs.mapNotNull { it.program }
-        val packages = programs.flatMap { it.requires["pacman"].orEmpty() }.distinct()
+        val packages = programs.flatMap { Apt.required(it.requires) }.distinct()
         val bins = programs.flatMap { it.programs }.distinct()
         if (packages.isEmpty() && bins.isEmpty()) {
             missing.clear()
@@ -965,14 +966,14 @@ class WidgetEngine(
         val missingBins = found.programs
         for (spec in specs) {
             val p = spec.program ?: continue
-            val need = p.requires["pacman"].orEmpty().filter { it in missingPkgs }
+            val need = Apt.required(p.requires).filter { it in missingPkgs }
             if (need.isEmpty()) missing.remove(spec.file.name) else missing[spec.file.name] = need
             if (need.isNotEmpty() && autoInstall.remove(spec.file.name)) installDependencies(spec)
             // With declared packages still missing, their programs are expected to be absent.
             val undeclared = if (need.isEmpty()) p.programs.filter { it in missingBins } else emptyList()
             for (bin in undeclared) {
                 if (warned.add("${spec.file.name}:${spec.stamp}:$bin")) {
-                    writeError(spec.file, "warning: runs `$bin`, which isn't installed; add its package to requires { pacman: [...] }", append = true)
+                    writeError(spec.file, "warning: runs `$bin`, which isn't installed; add its package to requires { apt: [...] }", append = true)
                 }
             }
         }
@@ -988,7 +989,7 @@ class WidgetEngine(
         if (packages.isEmpty() || installs[name] == Install.Running) return
         installs[name] = Install.Running
         scope.launch {
-            val (ok, tail) = runtime.pacman.lock.withLock { withContext(Dispatchers.IO) { proot.runJob(pacmanInstall(packages)) } }
+            val (ok, tail) = runtime.apt.lock.withLock { withContext(Dispatchers.IO) { proot.runJob(aptInstall(packages)) } }
             if (ok) installs.remove(name) else installs[name] = Install.Failed(tail.toString())
             // Other widgets may have been waiting on the same packages.
             checkDependencies(specs.toList())

@@ -4,7 +4,7 @@ widget "latency" {
   size: 6x2
   minSize: 3x2
 
-  requires { pacman: ["curl"] }
+  requires { apt: ["curl"] }
 
   // stream(): one long-running command; each output line becomes the new value.
   source rtt = stream("while :; do curl -o /dev/null -s -m 4 -w '%{time_total}\n' https://1.1.1.1 || echo -1; sleep 5; done")

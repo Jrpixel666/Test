@@ -26,21 +26,21 @@ import dev.omalauncher.linux.Package
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** Search Arch Linux ARM's repos and the AUR, install or remove packages; empty search lists what's installed. */
+/** Search Debian's archive, install or remove packages; empty search lists what's installed. */
 @Composable
 fun PackagesScreen(
     runtime: Runtime,
     onDismiss: () -> Unit,
 ) {
-    val pacman = runtime.pacman
+    val apt = runtime.apt
     val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
-    val revision = pacman.revision.intValue
+    val revision = apt.revision.intValue
     // (query, results): a result for an older query means a search is still running.
     val loaded by produceState<Pair<String, List<Package>>?>(null, query, revision) {
         val q = query.trim()
         if (q.isNotEmpty()) delay(350) // debounce typing
-        value = q to (if (q.isEmpty()) pacman.installed() else pacman.search(q))
+        value = q to (if (q.isEmpty()) apt.installed() else apt.search(q))
     }
     val searching = loaded?.first != query.trim()
 
@@ -52,8 +52,8 @@ fun PackagesScreen(
     OverlayPanel("packages", onDismiss, contentWidth = ReadingWidth) {
         SearchField(query, onChange = { query = it }, onGo = {}, placeholder = "search packages")
         BasicText(
-            "Arch Linux ARM packages via pacman, and the AUR via yay. Installing also updates the system, so it can take a while. " +
-                "AUR packages are user-submitted and built on the device: check their PKGBUILD on aur.archlinux.org first.",
+            "Debian ARM packages via apt. Kernels, firmware and VNC servers are held back: Linux runs under proot on " +
+                "Android's kernel, and its windows show in the launcher itself.",
             Modifier.padding(vertical = 8.dp),
             style = Mono.copy(color = Palette.muted, fontSize = TextSize.Small),
         )
@@ -67,14 +67,14 @@ fun PackagesScreen(
             }
         BasicText(status, Modifier.padding(bottom = 6.dp), style = Mono.copy(color = Palette.muted))
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            // By repo too: a package in two repos (one the user added) is listed by pacman twice.
+            // By repo too: a package in two repos (one the user added) is listed twice.
             items(list, key = { "${it.repo}/${it.name}" }) { pkg ->
                 PackageRow(
                     pkg = pkg,
-                    core = pkg.name in pacman.core,
-                    state = pacman.states[pkg.name] ?: JobState.Idle,
-                    onInstall = { act { pacman.install(pkg) } },
-                    onRemove = { act { pacman.remove(pkg.name) } },
+                    core = pkg.name in apt.core,
+                    state = apt.states[pkg.name] ?: JobState.Idle,
+                    onInstall = { act { apt.install(pkg) } },
+                    onRemove = { act { apt.remove(pkg.name) } },
                 )
             }
         }

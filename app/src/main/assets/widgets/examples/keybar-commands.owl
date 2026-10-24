@@ -15,7 +15,7 @@ keybar "commands" {
     {l: "↓", k: "down", r: true},
     {l: "esc", k: "esc"}
   ]
-  let commands = ["git status", "git diff", "git log --oneline -20", "ls -la", "cd ..", "btop", "sudo pacman -Syu", "clear"]
+  let commands = ["git status", "git diff", "git log --oneline -20", "ls -la", "cd ..", "btop", "apt update && apt upgrade", "clear"]
 
   component Control(k) {
     Box {

@@ -200,7 +200,7 @@ internal object GpuDrivers {
 
     /** Pacman for Mesa and the loader, then the pinned blob unless that exact file is already there. */
     fun installScript(driver: GpuDriver): String {
-        return pacmanInstall(driver.packages) + " && " + fetch(driver) + " && " + mesaZinkScript()
+        return aptInstall(driver.packages) + " && " + fetch(driver) + " && " + mesaZinkScript()
     }
 
     /**

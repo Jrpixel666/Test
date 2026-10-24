@@ -1,0 +1,90 @@
+name: build apk
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # Every package Bootstrap.kt installs must exist in Debian 13 for arm64, or the install stops there.
+  debian-packages:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the package names against trixie
+        run: |
+          core=$(scripts/debian-packages.py | tr '\n' ' ')
+          desktop=$(scripts/debian-packages.py --desktop | tr '\n' ' ')
+          packs=$(sed -n 's/.*ThemePack("\([a-z0-9.+-]*\)".*/\1/p' app/src/main/kotlin/dev/omalauncher/linux/Tweaks.kt | tr '\n' ' ')
+          docker run --rm debian:trixie bash -c "
+            set -e
+            apt-get update -qq
+            missing=''
+            for p in $core $desktop $packs; do
+              apt-cache show \"\$p\" >/dev/null 2>&1 || missing=\"\$missing \$p\"
+            done
+            echo \"missing:\${missing:- none}\"
+            # The core set installs in one apt call: it must resolve as a whole.
+            apt-get install -s --no-install-recommends $core > /tmp/core.txt
+            echo \"core: \$(grep -c '^Inst' /tmp/core.txt) packages\"
+            apt-get install -s --no-install-recommends hyprland > /tmp/hypr.txt && echo \"hyprland: \$(grep -c '^Inst' /tmp/hypr.txt) packages\"
+            for p in $core; do case \" \$missing \" in *\" \$p \"*) echo \"core package \$p is missing\" >&2; exit 1;; esac; done
+          "
+
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Fetch proot
+        run: |
+          sudo apt-get update -q && sudo apt-get install -yq libarchive-tools
+          ndk=$(sed -n 's/^NDK_VERSION=//p' scripts/fetch-proot.sh)
+          [ -d "$ANDROID_HOME/ndk/$ndk" ] || yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$ndk" >/dev/null
+          scripts/fetch-proot.sh
+
+      - name: Test
+        run: ./gradlew :owl:test :app:testDebugUnitTest
+
+      - name: Build
+        run: ./gradlew :app:assembleDebug :app:assembleRelease
+
+      - name: Collect
+        id: apk
+        run: |
+          name=$(sed -n 's/^ *versionName = "\(.*\)"/\1/p' app/build.gradle.kts)
+          mkdir -p out
+          cp app/build/outputs/apk/release/app-release.apk "out/debian-arm-launcher-$name.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "out/debian-arm-launcher-$name-debug.apk"
+          (cd out && sha256sum *.apk > SHA256SUMS && cat SHA256SUMS)
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: debian-arm-launcher-${{ steps.apk.outputs.name }}
+          path: out/*
+
+      # The newest build on a public download link, for installing straight from the phone.
+      - name: Publish the latest build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag=launcher-latest
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --target "$GITHUB_SHA" --prerelease \
+            --title "Debian ARM Launcher (latest build)" --notes "Built by CI from the newest push."
+          gh release edit "$tag" --notes "Built by CI from ${GITHUB_REF_NAME} at ${GITHUB_SHA}. Install debian-arm-launcher-${{ steps.apk.outputs.name }}.apk on an arm64 phone with Android 10 or newer."
+          gh release upload "$tag" out/* --clobber
+
+      - name: Lint
+        continue-on-error: true
+        run: ./gradlew :app:lintDebug

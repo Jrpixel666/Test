@@ -4,7 +4,7 @@ widget "ai usage" {
   size: 6x3
   minSize: 3x2
 
-  requires { pacman: ["jq", "procps-ng", "findutils"] }
+  requires { apt: ["jq", "procps", "findutils"] }
 
   // Today's tokens (UTC day) from the agents' own session logs, so no API keys are needed.
   // Claude Code: input + output + cache writes per message, messages counted once.

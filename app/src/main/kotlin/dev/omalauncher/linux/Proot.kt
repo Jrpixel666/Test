@@ -5,13 +5,13 @@ import dev.omalauncher.LauncherData
 import dev.omalauncher.upgrade.writeAtomically
 import java.io.File
 
-/** Paths and process launching for the proot'd Arch rootfs. */
+/** Paths and process launching for the proot'd Debian rootfs. */
 class Proot(
     private val context: Context,
 ) {
     private val nativeDir = File(context.applicationInfo.nativeLibraryDir)
     val filesDir: File = context.filesDir
-    val rootfs = File(filesDir, "arch")
+    val rootfs = File(filesDir, "debian")
     val tmpDir = File(filesDir, "tmp")
 
     /** Bound to XDG_RUNTIME_DIR inside the guest; holds the Wayland socket and the bridges' FIFOs. */
@@ -36,6 +36,9 @@ class Proot(
     /** How guest apps render OpenGL and Vulkan: in software, or on the GPU once [Gpu] turns it on. */
     @Volatile var graphicsEnv: List<String> = SOFTWARE_ENV
 
+    /** Themes and cursor picked in settings › tweaks; see [Tweaks]. */
+    @Volatile var tweakEnv: List<String> = emptyList()
+
     /** Replaces /usr/bin/bwrap in the guest, see assets/bwrap-shim.sh. */
     private val bwrapShim = File(filesDir, "bwrap-shim")
 
@@ -51,7 +54,7 @@ class Proot(
         )
 
     /**
-     * Android's Chinese, Japanese and Korean font, which the guest has none of (Arch's is ~300 MB).
+     * Android's Chinese, Japanese and Korean font, which the guest has none of (Debian's is ~300 MB).
      * Absent on some devices; the guest then goes without, as before.
      */
     private val cjkFont = File("/system/fonts/NotoSansCJK-Regular.ttc")
@@ -96,7 +99,7 @@ class Proot(
 
     /**
      * Resets what only lives as long as our process (guest processes die with
-     * it): /tmp, the runtime dir, a stale pacman lock. Writes the host-side
+     * it): /tmp, the runtime dir, stale apt and dpkg locks. Writes the host-side
      * stand-ins every guest command needs. Call once, before any guest runs.
      */
     fun prepare() {
@@ -110,7 +113,7 @@ class Proot(
             host.mkdirs()
             if (rootfs.isDirectory) File(rootfs, guest.removePrefix("/")).mkdirs()
         }
-        File(rootfs, "var/lib/pacman/db.lck").delete()
+        for (lock in listOf("var/lib/dpkg/lock", "var/lib/dpkg/lock-frontend", "var/lib/apt/lists/lock", "var/cache/apt/archives/lock")) File(rootfs, lock).delete()
         // An empty stand-in, so fontconfig lists the bound font when it reads the directory.
         if (rootfs.isDirectory) {
             val stub = File(rootfs, GUEST_CJK_FONT.removePrefix("/"))
@@ -177,7 +180,9 @@ class Proot(
                 "QT_QPA_PLATFORM=wayland",
                 "MOZ_ENABLE_WAYLAND=1",
                 "SDL_VIDEODRIVER=wayland",
-            ) + graphicsEnv + listOf("/bin/sh", "-c", script)
+                // apt and dpkg never stop to ask: nobody sees their prompts.
+                "DEBIAN_FRONTEND=noninteractive",
+            ) + graphicsEnv + tweakEnv + listOf("/bin/sh", "-c", script)
 
     /**
      * Kills every proot we started and every guest process: before the rootfs

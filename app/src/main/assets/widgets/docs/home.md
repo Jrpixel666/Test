@@ -42,7 +42,7 @@ tiles = [
 
 ## From scripts
 
-Anything in this system (a script, a cron job, a pacman hook, an agent) can reach a running widget:
+Anything in this system (a script, a cron job, an apt hook, an agent) can reach a running widget:
 
 ```
 $ owl-send build.owl set status passing     # sets the state `status`; a value that parses as JSON is JSON

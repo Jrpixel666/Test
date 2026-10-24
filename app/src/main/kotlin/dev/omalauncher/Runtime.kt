@@ -26,7 +26,9 @@ import dev.omalauncher.linux.FILES_COMMAND
 import dev.omalauncher.linux.Gpu
 import dev.omalauncher.linux.LinuxApp
 import dev.omalauncher.linux.OpenBridge
-import dev.omalauncher.linux.Pacman
+import dev.omalauncher.linux.Apt
+import dev.omalauncher.linux.Hyprland
+import dev.omalauncher.linux.Tweaks
 import dev.omalauncher.linux.Proot
 import dev.omalauncher.linux.SystemUpdates
 import dev.omalauncher.linux.LauncherFont
@@ -94,10 +96,11 @@ class Runtime(
     private val audio = AudioBridge(proot)
     private val openBridge = OpenBridge(context, proot, onOpenFiles = ::openFiles, onEdit = ::edit)
     val agents = AgentStore(proot, onChanged = ::syncGuest)
-    val pacman = Pacman(context, proot)
+    val apt = Apt(proot)
     val widgets = WidgetEngine(context, proot, this)
-    val updates = SystemUpdates(proot, pacman, agents)
-    val gpu = Gpu(context, proot, pacman)
+    val updates = SystemUpdates(proot, apt, agents)
+    val gpu = Gpu(context, proot, apt)
+    val tweaks = Tweaks(proot)
 
     /** The launcher's own provided files (default widgets, their docs); see [Provisioner]. */
     private val launcherFiles = Provisioner(proot.filesDir, LauncherData.LAUNCHER_MANIFEST, listOf(widgets::managed, style::managed))
@@ -111,13 +114,14 @@ class Runtime(
                 { defaultApps(proot.applications) },
                 { bundledIcons(context, proot.home) },
                 openBridge::managed,
-                pacman::managed,
+                apt::managed,
+                { Hyprland.managed(proot) },
                 agents::managed,
                 themes::managed,
                 widgets::guestManaged,
             ),
         )
-    val bootstrap = Bootstrap(context, proot, agents, pacman, provisioner)
+    val bootstrap = Bootstrap(context, proot, agents, apt, provisioner)
 
     /** Its jobs write files and start the guest; one that fails (storage full) mustn't take the home screen down. */
     private val scope =
@@ -128,11 +132,14 @@ class Runtime(
     private val prefs = LauncherData.prefs(context)
 
     /**
-     * The first-run screen is done: from then on the home screen shows, with
-     * or without Linux. Installs from before Linux was optional count as done.
+     * The start screen is done for this run: the home screen shows. Until Debian is installed (or an
+     * install was started), each start of the launcher asks again: launcher only, or launcher and Debian.
      */
-    var launcherReady by mutableStateOf(prefs.getBoolean(SETUP_DONE, false) || bootstrap.wanted)
+    var launcherReady by mutableStateOf(bootstrap.wanted)
         private set
+
+    /** The start screen finished once: Omarchy's themes were fetched, so picking the launcher only goes straight home. */
+    val welcomedBefore get() = prefs.getBoolean(SETUP_DONE, false)
 
     /** Linux is installed and its services run: guest commands (like the update check) can go. */
     private var linux = false
@@ -141,8 +148,6 @@ class Runtime(
     private var linuxJob: Job? = null
 
     init {
-        // Saved, so removing Linux later doesn't bring the first-run screen back.
-        if (launcherReady) prefs.edit().putBoolean(SETUP_DONE, true).apply()
         themes.loadPalette()
         // An agent or the user edited style.toml; the rest of the style is read where it's drawn.
         style.onExternalChange = { old, new ->
@@ -214,7 +219,7 @@ class Runtime(
         }
     }
 
-    /** The first-run screen is done; the home screen shows from now on, while the rest of the themes download. */
+    /** The start screen is done for this run; the home screen shows, while the rest of the themes download. */
     fun finishWelcome() {
         prefs.edit().putBoolean(SETUP_DONE, true).apply()
         launcherReady = true
@@ -332,6 +337,7 @@ class Runtime(
             synchronized(server) { server.input.setKeymap(proot.keymap.path) }
             agents.load()
         }
+        withContext(Dispatchers.IO) { tweaks.apply() }
         widgets.linuxChanged(true)
         refreshApps()
         withContext(Dispatchers.IO) { updates.load() }

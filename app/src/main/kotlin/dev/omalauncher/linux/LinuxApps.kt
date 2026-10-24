@@ -32,7 +32,7 @@ fun loadLinuxApps(proot: Proot): List<LinuxApp> {
     return dirs
         .flatMap { it.listFiles { f -> f.extension == "desktop" }.orEmpty().toList() }
         .distinctBy { it.name }
-        // An entry may be a link to an absolute guest path (AUR packages link from /opt), which the host can't open.
+        // An entry may be a link to an absolute guest path (packages that live in /opt link from there), which the host can't open.
         .mapNotNull { runCatching { parseDesktopEntry(it) }.getOrNull() }
         .distinctBy { it.name }
         .sortedBy { it.name.lowercase() }

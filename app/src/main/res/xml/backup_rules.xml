@@ -8,7 +8,7 @@
   data_extraction_rules.xml.
 -->
 <full-backup-content>
-    <exclude domain="file" path="arch" />
+    <exclude domain="file" path="debian" />
     <exclude domain="file" path="tmp" />
     <exclude domain="file" path="xdg" />
     <exclude domain="file" path="sys" />

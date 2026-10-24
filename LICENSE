@@ -24,3 +24,8 @@ SOFTWARE.
 
 This license does not cover the third-party files listed in THIRD_PARTY.md,
 including the coding agents' logos, which remain the trademarks of their owners.
+
+---
+
+Debian ARM Launcher is a modified version of Omalauncher by Simon Schubert and contributors
+(https://github.com/SimonSchubert/omalauncher), used under the MIT License above.

@@ -1,0 +1,39 @@
+name: debian rootfs
+
+# Exports the official arm64 debian:trixie image's filesystem as the rootfs the launcher downloads
+# (linux/Bootstrap.kt, ROOTFS_URL), with its SHA-256 beside it, on the release rootfs-debian-trixie.
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/rootfs.yml']
+  schedule:
+    # Monthly, for Debian's point releases and security fixes in the base image.
+    - cron: '17 4 3 * *'
+
+permissions:
+  contents: write
+
+jobs:
+  rootfs:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Export debian:trixie (arm64)
+        run: |
+          docker pull --platform linux/arm64 debian:trixie
+          id=$(docker create --platform linux/arm64 debian:trixie)
+          docker export "$id" | gzip -9 > debian-trixie-arm64.tar.gz
+          docker rm "$id"
+          sha256sum debian-trixie-arm64.tar.gz | tee debian-trixie-arm64.tar.gz.sha256
+          ls -la debian-trixie-arm64.tar.gz
+          tar tzf debian-trixie-arm64.tar.gz | grep -E 'keyrings|sources' || true
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag=rootfs-debian-trixie
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --target "$GITHUB_SHA" --prerelease \
+            --title "Debian 13 (trixie) arm64 rootfs" \
+            --notes "The filesystem of the official arm64 debian:trixie image, which the launcher unpacks and runs under proot. Rebuilt monthly."
+          gh release upload "$tag" debian-trixie-arm64.tar.gz debian-trixie-arm64.tar.gz.sha256 --clobber

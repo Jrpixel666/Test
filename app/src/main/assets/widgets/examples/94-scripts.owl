@@ -4,7 +4,7 @@ widget "scripts" {
   size: 6x3
   minSize: 3x2
 
-  requires { pacman: ["jq"] }
+  requires { apt: ["jq"] }
 
   // Every file in ~/.config/omalauncher/scripts is a row showing the first line it prints.
   // A line of JSON like {"text": "3 failing", "color": "red"} sets the text and its color.

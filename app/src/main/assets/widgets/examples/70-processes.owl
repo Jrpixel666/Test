@@ -4,7 +4,7 @@ widget "processes" {
   size: 3x5
   minSize: 3x2
 
-  requires { pacman: ["procps-ng", "btop"] }
+  requires { apt: ["procps", "btop"] }
 
   source top = cmd('ps -eo rss=,comm= --sort=-rss | head -6') every 10s
   // "  81234 firefox" -> {mem: bytes, name: "firefox"}

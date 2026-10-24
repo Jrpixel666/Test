@@ -30,8 +30,13 @@ import java.util.zip.GZIPInputStream
 import kotlin.concurrent.thread
 
 private const val TAG = "bootstrap"
-private const val ROOTFS_URL = "http://os.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz"
-private const val TARBALL = "ArchLinuxARM-aarch64-latest.tar.gz"
+/**
+ * Debian 13 (trixie) for arm64: the official debian:trixie image's filesystem, exported by this
+ * repo's CI (.github/workflows/rootfs.yml) and attached to a release, with its SHA-256 beside it.
+ */
+private const val ROOTFS_URL = "https://github.com/Jrpixel666/Test/releases/download/rootfs-debian-trixie/debian-trixie-arm64.tar.gz"
+private const val ROOTFS_SHA256_URL = "$ROOTFS_URL.sha256"
+private const val TARBALL = "debian-trixie-arm64.tar.gz"
 
 /** Attempts per network step before setup (or an update) reports a failure. */
 private const val NETWORK_TRIES = 3
@@ -39,11 +44,11 @@ private const val NETWORK_TRIES = 3
 /** How long `echo | cat` may take in the guest before setup calls the phone's kernel broken; it takes well under a second. */
 private const val FORK_CHECK_SECONDS = 30L
 
-/** Room for the download (~830 MB). */
-private const val TARBALL_SPACE = 900_000_000L
+/** Room for the download (~50 MB). */
+private const val TARBALL_SPACE = 100_000_000L
 
-/** Room for the unpacked system and what setup installs into it (~1.9 GB with an agent), with some to spare. */
-private const val SYSTEM_SPACE = 2_100_000_000L
+/** Room for the unpacked system and what setup installs into it, Hyprland and the themes too (~2.2 GB with an agent), with some to spare. */
+private const val SYSTEM_SPACE = 2_600_000_000L
 
 /** A failure that trying again can't fix, like a full disk: a network step stops at once rather than downloading again. */
 private class NoRetry(
@@ -59,33 +64,98 @@ private fun Throwable.outOfSpace() =
 private fun gigabytes(bytes: Long) = "%.1f GB".format(bytes / 1e9)
 
 /**
- * Omarchy's classic terminal apps. The Nerd Font glyphs come from the
- * symbols-only font: the full JetBrainsMono Nerd family is ~200 MB.
- * Changing this list needs a new id for the packages step.
+ * Omarchy's classic terminal apps, by their Debian names. The Nerd Font glyphs
+ * come from the launcher's own symbols font. Changing this list needs a new id
+ * for the packages step.
  */
 private val PACKAGES =
     listOf(
-        "foot", "ttf-dejavu", "btop", "fastfetch", "ttf-jetbrains-mono", "ttf-nerd-fonts-symbols-mono",
-        "neovim", "starship", "eza", "bat", "fd", "ripgrep", "fzf", "zoxide", "tmux", "gum", "jq", "tealdeer",
-        "man-db", "less", "dua-cli", "inxi", "whois", "git", "bash-completion", "pulseaudio", "pulseaudio-alsa", "micro",
+        "foot", "fonts-dejavu-core", "btop", "fastfetch", "fonts-jetbrains-mono",
+        "neovim", "eza", "bat", "fd-find", "ripgrep", "fzf", "zoxide", "tmux", "jq", "tealdeer",
+        "man-db", "less", "inxi", "whois", "git", "bash-completion", "pulseaudio", "pulseaudio-utils", "micro",
+        "libxkbcommon-tools", "fontconfig", "curl", "ca-certificates", "procps", "gawk", "findutils", "xdg-utils",
+        "unzip", "xz-utils", "mesa-vulkan-drivers", "libgl1-mesa-dri", "libegl1", "libgles2",
     )
 
-/** Omarchy's Winamp-style player; not in Arch's ARM repos, but upstream ships an arm64 build. */
+/**
+ * Hyprland and what it draws with, plus GTK, icon and cursor themes the tweaks screen offers.
+ * Installed one by one if the batch fails, so a name a mirror lacks costs only that package.
+ */
+private val DESKTOP_PACKAGES =
+    listOf(
+        "hyprland", "hyprpaper", "hyprland-protocols", "xwayland", "waybar", "wofi", "mako-notifier",
+        "gnome-themes-extra", "arc-theme", "numix-gtk-theme", "materia-gtk-theme",
+        "adwaita-icon-theme", "papirus-icon-theme", "breeze-cursor-theme", "dmz-cursor-theme",
+        "libgtk-3-bin", "gsettings-desktop-schemas", "dconf-cli",
+    )
+
+/** Debian names the binaries of these differently; the launcher and Omarchy's configs call them by the usual names. */
+private val ALIASES = mapOf("bat" to "/usr/bin/batcat", "fd" to "/usr/bin/fdfind")
+
+/** Omarchy's Winamp-style player; not in Debian, but upstream ships an arm64 build. */
 private const val CLIAMP_VERSION = "v2.3.0"
 private const val CLIAMP_URL = "https://github.com/bjarneo/cliamp/releases/download/$CLIAMP_VERSION/cliamp-linux-arm64"
 private const val CLIAMP_SHA256 = "827b4aa879feecab33ea621dc1460c60ffa765c210b5046d679ce5a4073d2b32"
 
-private val MIRRORS =
-    listOf(
-        "de.mirror.archlinuxarm.org",
-        "fl.us.mirror.archlinuxarm.org",
-        "eu.mirror.archlinuxarm.org",
-        "dk.mirror.archlinuxarm.org",
-        "mirror.archlinuxarm.org",
-    )
+/**
+ * Debian's CDN; plain http, since the image has no CA certificates until the first install. apt checks
+ * signatures itself, with [keyring] (the archive keyring's path moved between releases).
+ */
+private fun sources(keyring: String?): String {
+    val signedBy = keyring?.let { "Signed-By: $it\n" }.orEmpty()
+    return "Types: deb\nURIs: http://deb.debian.org/debian\nSuites: trixie trixie-updates\n" +
+        "Components: main contrib non-free non-free-firmware\n$signedBy\n" +
+        "Types: deb\nURIs: http://deb.debian.org/debian-security\nSuites: trixie-security\n" +
+        "Components: main contrib non-free non-free-firmware\n$signedBy"
+}
 
-/** Firmware and kernel modules are useless under proot; pacman never unpacks them. */
-private const val NO_EXTRACT = "NoExtract = usr/lib/firmware/* usr/lib/modules/*"
+private val KEYRINGS = listOf("/usr/share/keyrings/debian-archive-keyring.pgp", "/usr/share/keyrings/debian-archive-keyring.gpg")
+
+/**
+ * apt under proot: no privilege drop to _apt for downloads (proot's fake root can't), no
+ * recommends (they pull in half a desktop), patient retries for phone connections.
+ */
+private val APT_CONF =
+    """
+    APT::Sandbox::User "root";
+    APT::Install-Recommends "false";
+    APT::Install-Suggests "false";
+    Acquire::Retries "5";
+    Acquire::http::Timeout "60";
+    Dpkg::Use-Pty "0";
+    Dpkg::Options { "--force-confdef"; "--force-confold"; };
+    """.trimIndent() + "\n"
+
+/**
+ * Firmware and kernel modules are useless under proot, which runs on Android's kernel:
+ * dpkg never unpacks them, whatever package ships them.
+ */
+private val DPKG_NO_FIRMWARE =
+    """
+    path-exclude=/lib/firmware/*
+    path-exclude=/usr/lib/firmware/*
+    path-exclude=/lib/modules/*
+    path-exclude=/usr/lib/modules/*
+    path-exclude=/boot/*
+    """.trimIndent() + "\n"
+
+/**
+ * Packages apt may never install: kernels and firmware (see [DPKG_NO_FIRMWARE]), and VNC servers.
+ * The launcher is the display: Linux windows are Wayland clients of it, so nothing goes over VNC.
+ */
+private val APT_PINS =
+    """
+    Package: linux-image-* linux-headers-* linux-modules-* linux-firmware* firmware-* *-firmware intel-microcode amd64-microcode
+    Pin: release *
+    Pin-Priority: -1
+
+    Package: tigervnc-* tightvncserver x11vnc* wayvnc novnc vnc4server turbovnc* realvnc-*
+    Pin: release *
+    Pin-Priority: -1
+    """.trimIndent() + "\n"
+
+/** Services don't start from package scripts: there's no init under proot. */
+private const val POLICY_RC = "#!/bin/sh\nexit 101\n"
 
 /** What the bootstrap installs; the packages screen doesn't offer to remove these. */
 val CORE_PACKAGES = PACKAGES.toSet()
@@ -94,10 +164,11 @@ val CORE_PACKAGES = PACKAGES.toSet()
 enum class Stage(
     val label: String,
 ) {
-    Download("download arch linux"),
+    Download("download debian arm"),
     Extract("unpack the system"),
-    Configure("configure pacman"),
+    Configure("configure apt"),
     Packages("install omarchy's apps"),
+    Desktop("install hyprland and themes"),
     Agents("install coding agents"),
 }
 
@@ -146,7 +217,7 @@ private class Step(
 )
 
 /**
- * Sets up the Arch Linux ARM rootfs and keeps it current. A fresh install
+ * Sets up the Debian ARM rootfs and keeps it current. A fresh install
  * runs every [steps] entry behind the setup screen; after an app update only
  * the new ones run, see [Step].
  */
@@ -154,7 +225,7 @@ class Bootstrap(
     private val context: Context,
     private val proot: Proot,
     private val agents: AgentStore,
-    private val pacman: Pacman,
+    private val apt: Apt,
     /** The guest's files; see [Provisioner]. */
     private val provisioner: Provisioner,
 ) {
@@ -190,30 +261,31 @@ class Bootstrap(
 
     private val steps =
         listOf(
-            Step("rootfs", Stage.Download, "Downloading Arch Linux ARM", network = true) { installRootfs() },
-            Step("etc-2", Stage.Configure, "Configuring the system", network = false) { configure() },
+            Step("rootfs", Stage.Download, "Downloading Debian ARM", network = true) { installRootfs() },
+            Step("etc-1", Stage.Configure, "Configuring the system", network = false) { configure() },
             // Only before the first setup: a phone where Linux already runs can fork.
             Step("forks-1", Stage.Configure, "Checking that programs can start", network = false, isDone = { journal.setupComplete }) {
                 checkForks()
             },
-            Step("keyring-1", Stage.Configure, "Initializing pacman keyring", network = false) {
-                guest("pacman-key --init && pacman-key --populate archlinuxarm")
+            // The image has none, but a kernel or firmware that got in some other way only takes up room.
+            Step("no-kernel-1", Stage.Configure, "Removing kernel and firmware packages", network = false) {
+                guest(
+                    "p=\$(dpkg-query -W -f '\${Package}\\n' 'linux-image-*' 'linux-modules-*' 'firmware-*' 2>/dev/null); " +
+                        "[ -z \"\$p\" ] || apt-get purge -y \$p; true",
+                )
             },
-            // The ALARM image ships a kernel and firmware (~1 GB, split into sub-packages) we can't use.
-            Step("no-kernel-1", Stage.Configure, "Removing kernel packages", network = false) {
-                guest("pacman -Rdd --noconfirm linux-aarch64 \$(pacman -Qq | grep ^linux-firmware); true")
-            },
-            Step("packages-1", Stage.Packages, "Installing packages", network = true) { guest(pacmanInstall(PACKAGES, refresh = true)) },
+            Step("packages-1", Stage.Packages, "Installing packages", network = true) { guest(aptInstall(PACKAGES, refresh = true)) },
+            Step("aliases-1", Stage.Packages, "Linking bat and fd", network = false) { linkAliases() },
             Step("keymap-1", Stage.Packages, "Compiling keymap", network = false, isDone = { proot.keymap.exists() }) { compileKeymap() },
-            Step("cliamp-$CLIAMP_VERSION", Stage.Packages, "Installing cliamp", network = true) { installCliamp() },
-            // Omarchy's themes were a step here ("omarchy-<ref>") until Linux became optional; ThemeStore fetches them now.
+            Step("cliamp-$CLIAMP_VERSION", Stage.Packages, "Installing cliamp", network = true, optional = true) { installCliamp() },
+            Step("desktop-1", Stage.Desktop, "Installing Hyprland and themes", network = true, optional = true) { guest(aptInstallEach(DESKTOP_PACKAGES)) },
         )
 
     private fun Step.done() = isDone?.invoke() ?: (id in journal)
 
     /**
      * Runs the step; one that needs the network gets a few tries, since phone connections drop.
-     * Retrying is cheap: pacman keeps what it already downloaded, and downloads resume.
+     * Retrying is cheap: apt keeps what it already downloaded, and downloads resume.
      */
     private suspend fun Step.attempt() {
         repeat(if (network) NETWORK_TRIES - 1 else 0) { n ->
@@ -295,7 +367,7 @@ class Bootstrap(
         withContext(Dispatchers.IO) {
             _state.value = LinuxState.Removing
             backlog = emptyList()
-            pacman.lock.withLock {
+            apt.lock.withLock {
                 try {
                     LauncherData.deleteTree(proot.rootfs)
                 } catch (e: Exception) {
@@ -373,8 +445,8 @@ class Bootstrap(
             for (step in todo) {
                 _updates.value = JobState.Working(step.label, emptyList())
                 try {
-                    // Package steps run pacman; nothing else may hold its lock meanwhile.
-                    pacman.lock.withLock { step.attempt() }
+                    // Package steps run apt; nothing else may hold its lock meanwhile.
+                    apt.lock.withLock { step.attempt() }
                     journal.mark(step.id)
                 } catch (e: Throwable) {
                     Log.w(TAG, "update step ${step.id} failed", e)
@@ -440,7 +512,7 @@ class Bootstrap(
             if (tarball.parentFile == context.cacheDir) tarball.delete()
             throw e
         }
-        tarball.delete() // ~830 MB we no longer need
+        tarball.delete() // the download is no longer needed
     }
 
     /** Stops before writing when the app's storage has less than [bytes] free: a full phone fails at once, not after the download. */
@@ -467,7 +539,7 @@ class Bootstrap(
         val partial = File(context.cacheDir, "$TARBALL.part")
         val validator = File(context.cacheDir, "$TARBALL.version")
         requireSpace(TARBALL_SPACE - (if (partial.exists()) partial.length() else 0L) + SYSTEM_SPACE)
-        report(Stage.Download, "Downloading Arch Linux ARM", 0f)
+        report(Stage.Download, "Downloading Debian ARM", 0f)
         val conn = openHttp(ROOTFS_URL)
         connection = conn
         try {
@@ -478,6 +550,7 @@ class Bootstrap(
             conn.disconnect()
         }
         checkCancelled()
+        verify(partial)
         // Only a complete download is kept for a retry.
         check(partial.renameTo(target)) { "can't move the download into place" }
         validator.delete()
@@ -574,6 +647,36 @@ class Bootstrap(
             name.startsWith("usr/lib/modules/") ||
             name.startsWith("dev/")
 
+    /**
+     * Compares [file] with the checksum CI published next to the rootfs. A mismatch (a captive
+     * portal's page, a rebuilt image spliced onto an old partial download) deletes it for a fresh try.
+     */
+    private fun verify(file: File) {
+        val conn = openHttp(ROOTFS_SHA256_URL, connectTimeout = 15_000, readTimeout = 20_000)
+        val expected =
+            try {
+                if (conn.responseCode != 200) throw IOException("HTTP ${conn.responseCode} for the rootfs checksum")
+                conn.inputStream.bufferedReader().readText().trim().substringBefore(' ').lowercase()
+            } finally {
+                conn.disconnect()
+            }
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buf = ByteArray(1 shl 16)
+            while (true) {
+                checkCancelled()
+                val n = input.read(buf)
+                if (n < 0) break
+                digest.update(buf, 0, n)
+            }
+        }
+        if (digest.digest().hex() != expected) {
+            file.delete()
+            File(context.cacheDir, "$TARBALL.version").delete()
+            error("the Debian download doesn't match its checksum; retry to download it again")
+        }
+    }
+
     private fun configure() {
         val root = proot.rootfs
         File(root, "etc/resolv.conf").apply {
@@ -581,18 +684,47 @@ class Bootstrap(
             writeText("nameserver 8.8.8.8\nnameserver 1.1.1.1\n")
         }
         File(root, "etc/hosts").writeText("127.0.0.1 localhost\n::1 localhost\n")
-        File(root, "etc/locale.conf").writeText("LANG=C.UTF-8\n")
-        // The geo-balanced default mirror often lags behind; pacman falls through this list on 404s.
-        File(root, "etc/pacman.d/mirrorlist").writeText(MIRRORS.joinToString("") { "Server = http://$it/\$arch/\$repo\n" })
-        // pacman drops privileges and uses Landlock for downloads; neither works under proot.
-        // Its low-speed timeout aborts big packages on slow phone connections, every retry.
-        val conf = File(root, "etc/pacman.conf")
-        conf.writeText(
-            conf
-                .readText()
-                .replace(Regex("(?m)^(DownloadUser|CheckSpace|DisableSandbox|DisableDownloadTimeout|NoExtract)\\b.*\n"), "")
-                .replaceFirst("[options]", "[options]\nDisableSandbox\nDisableDownloadTimeout\n$NO_EXTRACT"),
-        )
+        File(root, "etc/hostname").writeText("debian-arm\n")
+        File(root, "etc/default/locale").apply {
+            parentFile?.mkdirs()
+            writeText("LANG=C.UTF-8\n")
+        }
+        // The image's own list, replaced by one that also has contrib and non-free (fonts, some themes).
+        File(root, "etc/apt/sources.list").delete()
+        File(root, "etc/apt/sources.list.d").apply { mkdirs() }.listFiles()?.forEach { it.delete() }
+        val keyring = KEYRINGS.firstOrNull { File(root, it.removePrefix("/")).isFile }
+        File(root, "etc/apt/sources.list.d/debian.sources").writeText(sources(keyring))
+        File(root, "etc/apt/apt.conf.d/99proot").apply {
+            parentFile?.mkdirs()
+            writeText(APT_CONF)
+        }
+        // The docker image drops man pages and caches; the launcher wants man pages, apt's lists are kept.
+        File(root, "etc/dpkg/dpkg.cfg.d/excludes").delete()
+        File(root, "etc/apt/apt.conf.d/docker-clean").delete()
+        File(root, "etc/apt/apt.conf.d/docker-gzip-indexes").delete()
+        File(root, "etc/apt/apt.conf.d/docker-no-languages").delete()
+        File(root, "etc/dpkg/dpkg.cfg.d/01-proot-no-firmware").apply {
+            parentFile?.mkdirs()
+            writeText(DPKG_NO_FIRMWARE)
+        }
+        File(root, "etc/apt/preferences.d/proot").apply {
+            parentFile?.mkdirs()
+            writeText(APT_PINS)
+        }
+        File(root, "usr/sbin/policy-rc.d").apply {
+            writeText(POLICY_RC)
+            setExecutable(true, false)
+        }
+    }
+
+    /** /usr/local/bin/bat and fd, for the names Debian gives them. */
+    private fun linkAliases() {
+        for ((name, target) in ALIASES) {
+            val link = File(proot.rootfs, "usr/local/bin/$name")
+            link.parentFile?.mkdirs()
+            link.delete()
+            Os.symlink(target, link.path)
+        }
     }
 
     private fun compileKeymap() {
@@ -612,7 +744,7 @@ class Bootstrap(
         val target = File(proot.rootfs, "usr/local/bin/cliamp")
         val tmp = File(target.parentFile, ".cliamp.download")
         val digest = MessageDigest.getInstance("SHA-256")
-        // Runs under pacman's lock, so a stalled download must time out rather than hold it.
+        // Runs under apt's lock, so a stalled download must time out rather than hold it.
         val conn = openHttp(CLIAMP_URL, connectTimeout = 10_000, readTimeout = 20_000)
         try {
             conn.useCaches = false
@@ -642,7 +774,7 @@ class Bootstrap(
     /**
      * Runs a pipeline, the smallest guest command that forks. Some custom ROM kernels (4.14, with Android's cgroup v2
      * freezer backported but not its follow-up, upstream 05b289263772) make every fork of a traced process restart
-     * forever (#105), and the next step, pacman-key, would hang without a word. Such a phone gets an error naming the cause.
+     * forever (omalauncher#105), and the next step, apt, would hang without a word. Such a phone gets an error naming the cause.
      */
     private fun checkForks() {
         val process = proot.process("echo forks | cat").start()
@@ -660,7 +792,7 @@ class Bootstrap(
         log.add("a guest command that starts another one didn't finish in $FORK_CHECK_SECONDS s (kernel ${System.getProperty("os.version")})")
         error(
             "this phone's kernel stops Linux programs from starting other programs, so setup can't go on. " +
-                "custom ROMs with a 4.14 kernel need kernel commit 05b289263772 from their maintainer; see github issue #105",
+                "custom ROMs with a 4.14 kernel need kernel commit 05b289263772 from their maintainer",
         )
     }
 

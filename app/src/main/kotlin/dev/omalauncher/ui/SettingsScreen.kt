@@ -48,6 +48,7 @@ fun SettingsScreen(
     onAgents: () -> Unit,
     onPackages: () -> Unit,
     onLinux: () -> Unit,
+    onTweaks: () -> Unit,
     onLicenses: () -> Unit,
     onGestures: () -> Unit,
 ) {
@@ -73,7 +74,7 @@ fun SettingsScreen(
                 is LinuxState.Installing -> "installing" + (l.progress?.let { " ${(it * 100).toInt()}%" } ?: "") + " · ${l.stage.label}"
                 is LinuxState.Failed -> "setup stopped · retry"
                 LinuxState.Removing -> "removing…"
-                else -> "not installed · install Arch Linux for terminal apps and agents"
+                else -> "not installed · install Debian ARM for terminal apps, Hyprland and agents"
             }
         val rows =
             listOfNotNull(
@@ -86,7 +87,8 @@ fun SettingsScreen(
                 } else {
                     Triple("coding agents", "needs linux", onLinux)
                 },
-                Triple("packages", if (installed) "install Linux apps and tools with pacman and the AUR" else "needs linux", if (installed) onPackages else onLinux),
+                Triple("packages", if (installed) "install Linux apps and tools with apt" else "needs linux", if (installed) onPackages else onLinux),
+                Triple("tweaks", if (installed) "gtk, icon and cursor themes, hyprland · from your debian install" else "needs linux", if (installed) onTweaks else onLinux),
                 if (localNetworkMissing) {
                     Triple("local network", "let widgets and linux reach your printer, home assistant, …") {
                         askLocalNetwork.launch(LocalNetwork.PERMISSION)
@@ -97,7 +99,7 @@ fun SettingsScreen(
                 Triple("android settings", "the phone's system settings") {
                     context.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 },
-                Triple("licenses", "open source software in Omalauncher", onLicenses),
+                Triple("licenses", "open source software in this launcher", onLicenses),
             )
         UpdatesBox(runtime, installed)
         if (installed) SetupUpdates(runtime)
@@ -198,7 +200,7 @@ private fun UpdatesBox(
     }
 }
 
-/** Pending pacman and agent updates, from the last check; "update" runs them as one job. */
+/** Pending apt and agent updates, from the last check; "update" runs them as one job. */
 @Composable
 private fun LinuxUpdatesRows(runtime: Runtime) {
     val updates = runtime.updates

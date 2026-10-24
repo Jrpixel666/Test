@@ -204,7 +204,7 @@ internal const val HANDLER_LET = "let in a handler"
  * package name may look like. Names end up in a shell command, so the
  * pattern is strict.
  */
-internal val MANAGERS = mapOf("pacman" to Regex("[a-z0-9@_+][a-z0-9@._+-]*"))
+internal val MANAGERS = mapOf("apt" to Regex("[a-z0-9][a-z0-9.+-]*"), "pacman" to Regex("[a-z0-9@_+][a-z0-9@._+-]*"))
 
 // onLongPress only off the home grid: on a tile, long-press belongs to the home screen, which lifts the tile to move it.
 internal val HANDLER_PARAMS =

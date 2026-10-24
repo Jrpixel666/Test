@@ -10,18 +10,28 @@ import kotlinx.coroutines.withContext
 fun shellQuote(s: String) = shQuote(s)
 
 /**
- * Installs [packages] with a full sync, never a partial upgrade, then drops
- * the downloaded packages: storage on phones is tight. [refresh] re-downloads
- * the package databases even if pacman thinks they're current: mirrors lag
- * each other, and a database from one names versions another no longer has.
+ * Installs [packages] with apt after refreshing its lists, without recommends, then drops the
+ * downloaded .debs: storage on phones is tight. [refresh] is kept for callers that ask for it;
+ * apt always reads fresh lists here, since a stale list names versions the mirror no longer has.
  */
-fun pacmanInstall(
+@Suppress("UNUSED_PARAMETER")
+fun aptInstall(
     packages: Collection<String>,
     refresh: Boolean = false,
-) = "pacman -Sy${if (refresh) "y" else ""}u --noconfirm --needed ${packages.joinToString(" ") { shellQuote(it) }} && $CLEAN_PACMAN_CACHE"
+) = "apt-get update && apt-get install -y --no-install-recommends ${packages.joinToString(" ") { shellQuote(it) }} && $CLEAN_APT_CACHE"
 
-/** `pacman -Scc --noconfirm` answers its "remove all?" prompt with the default, No, so delete directly. */
-const val CLEAN_PACMAN_CACHE = "rm -rf /var/cache/pacman/pkg/*"
+/**
+ * Installs what it can of [packages]: all at once, or, when one of them is missing from the
+ * mirror (a name Debian doesn't carry), one by one, skipping the ones that fail.
+ */
+fun aptInstallEach(packages: Collection<String>): String {
+    val names = packages.joinToString(" ") { shellQuote(it) }
+    return "apt-get update && { apt-get install -y --no-install-recommends $names || " +
+        "for p in $names; do apt-get install -y --no-install-recommends \"\$p\" || echo \"skipped \$p\"; done; } && $CLEAN_APT_CACHE"
+}
+
+/** Downloaded packages; apt keeps them until cleaned. */
+const val CLEAN_APT_CACHE = "apt-get clean"
 
 /** Progress of a guest job started from the UI: installing an agent, a package, a widget's packages. */
 sealed interface JobState {

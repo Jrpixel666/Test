@@ -59,9 +59,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * The first-run screen: pick a theme and, optionally, set up Linux. Start
- * fetches Omarchy's themes, then the home screen opens; a Linux install
- * carries on in the background.
+ * The start screen: pick a theme and what to set up, the launcher only or the launcher and Debian ARM.
+ * It shows each time the launcher starts until Debian is installed (or installing); see
+ * [Runtime.launcherReady]. Start fetches Omarchy's themes the first time, then the home screen opens; a
+ * Debian install carries on in the background.
  */
 @Composable
 internal fun SetupScreen(runtime: Runtime) {
@@ -77,6 +78,8 @@ internal fun SetupScreen(runtime: Runtime) {
     // Only the picked theme now; the rest download in the background once home is up.
     fun fetchTheme() {
         error = null
+        // Fetched on an earlier start: the launcher-only choice goes straight home, the rest download there.
+        if (runtime.welcomedBefore) return runtime.finishWelcome()
         scope.launch {
             error = themes.fetchPicked()
             if (error == null) runtime.finishWelcome()
@@ -96,7 +99,7 @@ internal fun SetupScreen(runtime: Runtime) {
                 if (started) {
                     ThemeDownloadProgress(themes.choices.firstOrNull { it.name == themes.picked }?.title?.lowercase() ?: themes.picked, error, onRetry = ::fetchTheme, onSkip = runtime::finishWelcome)
                 } else {
-                    Welcome(themes, pickedFocus, linux, { linux = !linux }, picked) { bin -> picked = if (bin in picked) picked - bin else picked + bin }
+                    Welcome(themes, pickedFocus, linux, { linux = it }, picked) { bin -> picked = if (bin in picked) picked - bin else picked + bin }
                 }
             }
         }
@@ -124,7 +127,7 @@ private fun Wordmark() {
         }
     }
     Spacer(Modifier.height(20.dp))
-    BasicText("◆ omalauncher", style = Mono.copy(color = Palette.accent, fontSize = 28.sp, fontWeight = FontWeight.Bold))
+    BasicText("◆ debian arm launcher", style = Mono.copy(color = Palette.accent, fontSize = 28.sp, fontWeight = FontWeight.Bold))
 }
 
 @Composable
@@ -132,18 +135,19 @@ private fun Welcome(
     themes: ThemeStore,
     pickedFocus: FocusRequester,
     linux: Boolean,
-    onToggleLinux: () -> Unit,
+    onChooseLinux: (Boolean) -> Unit,
     picked: List<String>,
     onToggle: (String) -> Unit,
 ) {
     Appear(0) {
         Column {
             Spacer(Modifier.height(10.dp))
-            BasicText("omarchy on your home screen", style = Mono.copy(fontSize = TextSize.Large))
+            BasicText("debian arm on your home screen", style = Mono.copy(fontSize = TextSize.Large))
             Spacer(Modifier.height(10.dp))
             BasicText(
-                "Omarchy's themes and wallpapers, your Android apps, and home-screen widgets. Arch Linux adds " +
-                    "terminal apps and coding agents, now or later in settings.",
+                "Omarchy's themes and wallpapers, your Android apps, and Owl widgets. Debian ARM adds a full Linux " +
+                    "system under proot, without root: terminal apps, Hyprland, apt and coding agents. This screen " +
+                    "comes back each time the launcher starts until Debian is installed.",
                 style = Mono.copy(color = Subtle, lineHeight = 20.sp),
             )
         }
@@ -164,9 +168,12 @@ private fun Welcome(
     Spacer(Modifier.height(32.dp))
     Appear(2) {
         Column {
-            Label("linux")
+            Label("install")
             Spacer(Modifier.height(12.dp))
-            Choice("also set up Arch Linux", "terminal apps, agents, pacman · ~1 GB download, 3 GB space", linux, onToggleLinux)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Choice("launcher only", "themes, widgets and your android apps · asks again next start", !linux) { onChooseLinux(false) }
+                Choice("launcher and debian arm", "debian 13 under proot, hyprland, apt · ~600 MB download, 3 GB space", linux) { onChooseLinux(true) }
+            }
             if (linux) {
                 Spacer(Modifier.height(24.dp))
                 AgentPicker(picked, onToggle)
@@ -201,10 +208,10 @@ private fun StartButton(
 ) {
     Column {
         // Keys on it wait out the theme's download, for try again should it fail.
-        PrimaryButton(if (linux) "start and set up linux" else "start", Modifier.passesKeys(), onStart)
+        PrimaryButton(if (linux) "start and install debian arm" else "start the launcher only", Modifier.passesKeys(), onStart)
         BasicText(
             if (linux) {
-                "Linux downloads about 1 GB, so Wi-Fi is best, and takes 3 GB of space. It installs in the " +
+                "Debian and its apps download about 600 MB, so Wi-Fi is best, and take 3 GB of space. They install in the " +
                     "background in 10 to 20 minutes; the home screen is ready right away."
             } else {
                 "Downloads the theme's wallpaper now and Omarchy's other themes (about 70 MB) in the background."
@@ -320,7 +327,7 @@ internal fun LinuxProgress(
     val current = working?.stage ?: failed?.stage ?: Stage.Download
     val log = working?.log ?: failed?.log.orEmpty()
     BasicText(
-        if (failed != null) "setup stopped" else "setting up linux",
+        if (failed != null) "setup stopped" else "setting up debian arm",
         style = Mono.copy(fontSize = TextSize.Large, color = if (failed != null) Palette.red else Palette.foreground),
     )
     Spacer(Modifier.height(24.dp))

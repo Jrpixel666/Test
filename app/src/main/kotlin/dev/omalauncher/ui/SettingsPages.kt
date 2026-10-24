@@ -42,6 +42,9 @@ enum class SettingsPage {
     Linux,
     Licenses,
     Gestures,
+
+    /** Themes and Hyprland's look, from the Debian install. */
+    Tweaks,
 }
 
 /** Opens [page] over the ones in [stack]; one that's already open comes back to the top, closing what's over it. */
@@ -113,6 +116,7 @@ private fun SettingsPage(
                 onAgents = { stack.push(SettingsPage.Agents) },
                 onPackages = { stack.push(SettingsPage.Packages) },
                 onLinux = { stack.push(SettingsPage.Linux) },
+                onTweaks = { stack.push(SettingsPage.Tweaks) },
                 onLicenses = { stack.push(SettingsPage.Licenses) },
                 onGestures = { stack.push(SettingsPage.Gestures) },
             )
@@ -162,5 +166,6 @@ private fun SettingsPage(
         SettingsPage.Linux -> LinuxScreen(runtime, onDismiss = close)
         SettingsPage.Licenses -> LicensesScreen(onDismiss = close)
         SettingsPage.Gestures -> GesturesScreen(runtime, onDismiss = close, onAgent = ::agent)
+        SettingsPage.Tweaks -> if (linuxInstalled) TweaksScreen(runtime, onDismiss = close) else LinuxScreen(runtime, onDismiss = close)
     }
 }

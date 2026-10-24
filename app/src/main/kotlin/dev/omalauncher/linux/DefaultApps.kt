@@ -32,6 +32,7 @@ private val CURATED =
         "omarchy-files" to entry("Files", FILES_COMMAND, terminal = false, icon = bundledIcon("files")),
         "micro" to entry("Editor", EDIT_COMMAND, terminal = false, icon = bundledIcon("editor")),
         "cliamp" to entry("Cliamp", "cliamp", icon = bundledIcon("cliamp")),
+        "hyprland-session" to entry("Hyprland", HYPRLAND_COMMAND, terminal = false, icon = "hyprland"),
     )
 
 /**

@@ -92,10 +92,10 @@ fun rememberLinuxInstall(runtime: Runtime): (List<String>) -> Unit {
 private fun InstallOffer(runtime: Runtime) {
     var picked by rememberSaveable { mutableStateOf(listOf(AGENTS.first().bin)) }
     val install = rememberLinuxInstall(runtime)
-    BasicText("arch linux, optional", style = Mono.copy(fontSize = TextSize.Large))
+    BasicText("debian arm, optional", style = Mono.copy(fontSize = TextSize.Large))
     Spacer(Modifier.height(8.dp))
     BasicText(
-        "Linux apps, terminal widgets, coding agents, pacman and Files. About 1 GB to download and 3 GB of space; installs in the background.",
+        "Debian 13 under proot, no root needed: Linux apps, Hyprland, terminal widgets, coding agents, apt and Files. Firmware and kernel modules are left out; windows show in the launcher, no VNC. About 600 MB to download and 3 GB of space; installs in the background.",
         style = Mono.copy(color = Palette.muted, fontSize = TextSize.Small),
     )
     Spacer(Modifier.height(16.dp))
@@ -117,7 +117,7 @@ private fun Installed(runtime: Runtime) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            BasicText("arch linux", style = Mono.copy(fontSize = TextSize.Item))
+            BasicText("debian arm", style = Mono.copy(fontSize = TextSize.Item))
             BasicText(
                 "installed · " + (size?.let(::formatSize) ?: "measuring…"),
                 style = Mono.copy(color = Palette.muted, fontSize = TextSize.Small),

@@ -6,7 +6,7 @@ Part of the widget docs: README.md, one folder up, comes first, and paths here a
 
 | declaration | meaning |
 |---|---|
-| `source x = cmd("...") every 5s` | runs a bash command in this Arch system; `x` is its output (stdout, trimmed). Add `json` to parse JSON output, `timeout 30s` to allow more than 10 s, `status` to get `{out, err, code, ok}` instead (see below), `optional` to let the widget work without Linux (see Without Linux). Default interval: 60 s |
+| `source x = cmd("...") every 5s` | runs a bash command in this Debian system; `x` is its output (stdout, trimmed). Add `json` to parse JSON output, `timeout 30s` to allow more than 10 s, `status` to get `{out, err, code, ok}` instead (see below), `optional` to let the widget work without Linux (see Without Linux). Default interval: 60 s |
 | `source x = stream("...")` | a long-running command; every line it prints becomes the new value. Add `json` for JSON lines. At most 4 different streams run at once |
 | `source x = http("https://...") every 10m` | an HTTP GET from Android, no curl or shell needed. Takes `json`, `timeout` and `status` like cmd (with `status`, `code` is the HTTP status and `ok` means 2xx), and optionally headers: `http(url, {Accept: "application/json"})`. A response over 1 MB fails (`the response is over 1 MB`), and the interval is 5 s or more. Prefer it over `cmd("curl ...")`. A URL can hold values, through `enc()` (see Values in URLs); it's fetched again as soon as it changes, and a `null` URL pauses the source, keeping its last value: `http(tab == "news" ? "https://..." : null)` fetches only while that tab shows. A failed fetch (offline, an error status, a rate limit) is tried again after 30 s |
 | `source x = file("~/.cache/x.json")` | a file in this system, read again whenever it changes (no polling, no shell). Add `json` to parse it. A missing file reads as `""`; at most 1 MB is read. Prefer it over `cmd("cat ...") every 5s` (owl 4) |
@@ -19,7 +19,7 @@ Part of the widget docs: README.md, one folder up, comes first, and paths here a
 | `let p = prev(x)` | the previous value of `x`, for rates: `let rate = (bytes - p) / 5` |
 | `component Name(a, b = 1) { ... }` | a reusable node; use it as `Name { a: 1 }` |
 | `asset logo = base64"iVBOR..."` | an embedded image (under 2 MB) for `Image { src: logo }`, or a font for `font: logo` (owl 10, see Fonts in docs/nodes.md), so the widget is one self-contained file |
-| `requires { pacman: ["jq", "curl"] }` | packages the widget's commands need; see Dependencies |
+| `requires { apt: ["jq", "curl"] }` | packages the widget's commands need; see Dependencies |
 | `meta { description: "..."; version: "1.0"; license: "MIT"; category: "news" }` | needed to publish to the widget store (see docs/sharing.md) |
 | `meta { owl: 12 }` | the language version the file needs (this launcher has 13; the default is 1). Older launchers say "update the launcher" instead of failing on what they don't know. Using what a later level added without declaring it is an error; docs/versions.md lists what came when |
 | `onTap: ...` | runs when the tile (not a button inside it) is tapped |
@@ -123,25 +123,27 @@ Declare every package your commands need, by package manager:
 
 ```owl
 widget "grok" {
-  requires { pacman: ["jq", "curl"] }
+  requires { apt: ["jq", "curl"] }
   source info = cmd('jq -c . ~/.cache/usage.json') every 5m json
   Text { text: "${info.use}%" }
 }
 ```
 
 - When a declared package is missing, the tile says `needs jq` with an **install** button
-  instead of running the widget. That runs `pacman -Syu --needed`, the same way the system was
+  instead of running the widget. That runs `apt-get install`, the same way the system was
   set up. If it fails, the tile offers **fix with agent**.
-- Names are package names, not program names (`dig` comes from `bind`). Find the owner of a
-  program with `pacman -F dig` or `pacman -Qo $(command -v dig)`.
+- Names are Debian package names, not program names (`dig` comes from `bind9-dnsutils`). Find
+  the owner of a program with `dpkg -S $(command -v dig)`, or `apt-file search bin/dig`.
+- `requires { pacman: [...] }` from widgets written for Arch still works: the launcher maps the
+  few names Debian calls differently (procps-ng → procps, github-cli → gh) and uses the rest as is.
 - Base tools (coreutils, grep, sed, bash) are always there; declaring them is optional.
 - The launcher also reads the programs your fixed commands run. If one isn't installed and
   isn't covered by `requires`, `.errors/<file>.txt` gets a warning.
-- While writing a widget, install what you declare with `pacman -S --needed <packages>`.
+- While writing a widget, install what you declare with `apt-get install -y <packages>`.
 
 ## Without Linux
 
-Linux (this Arch system) is an optional download in the launcher. A widget that runs commands,
+Linux (this Debian ARM system) is an optional download in the launcher. A widget that runs commands,
 declares packages or has a `Terminal` needs it: without Linux its tile offers to install Linux
 instead of running. Widgets with only `http`, `clock` and `android.*` sources work on any phone.
 Tapping `terminal(...)` or `app(...)` without Linux opens the install sheet, so those don't
@@ -154,7 +156,7 @@ until Linux is installed and running, and `linux` says whether it is:
 widget "kernel" {
   meta { owl: 5 }
   source sys = android.system every 1m
-  source pkgs = cmd("pacman -Qq | wc -l") every 10m optional
+  source pkgs = cmd("dpkg -l | grep -c ^ii") every 10m optional
   Column {
     Text { text: "kernel ${sys.kernel}" }
     if linux {
@@ -167,4 +169,4 @@ widget "kernel" {
 ```
 
 `optional` works on `cmd`, `stream` and `file`. Keep such a widget's commands to base tools
-(coreutils, grep, sed, awk, bash, pacman): `requires` makes a widget need Linux again.
+(coreutils, grep, sed, awk, bash, apt): `requires` makes a widget need Linux again.

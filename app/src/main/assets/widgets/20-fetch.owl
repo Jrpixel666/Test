@@ -3,20 +3,20 @@ widget "fetch" {
   order: 2
   size: 3x3
   minSize: 3x2
-  meta { description: "Your phone at a glance, fastfetch style, with or without Linux: CPU, memory, storage, battery and theme, plus Arch's packages once Linux is installed. Tap it for every detail"; version: "1.6"; license: "MIT"; category: "system"; owl: 13 }
+  meta { description: "Your phone at a glance, fastfetch style, with or without Linux: CPU, memory, storage, battery and theme, plus Debian's packages once Linux is installed. Tap it for every detail"; version: "1.6"; license: "MIT"; category: "system"; owl: 13 }
 
   // The phone, from Android: works without Linux.
   source dev = android.device
   source sys = android.system every 5s
   source bat = android.battery
   source net = android.network every 5s
-  // The Arch side, once Linux is installed. Base tools only, so it doesn't make the widget need Linux.
+  // The Debian side, once Linux is installed. Base tools only, so it doesn't make the widget need Linux.
   source lx = cmd("""
     . /etc/os-release
     printf '{"os":"%s","pkgs":%s,"explicit":%s,"shell":"%s","upgraded":"%s"}' \
-      "$PRETTY_NAME" "$(pacman -Qq | wc -l)" "$(pacman -Qqe | wc -l)" \
+      "$PRETTY_NAME" "$(dpkg -l | grep -c '^ii')" "$(apt-mark showmanual | wc -l)" \
       "$(basename "$SHELL") $(bash --version | head -1 | awk '{print $4}' | cut -d'(' -f1)" \
-      "$(grep -a 'starting full system upgrade' /var/log/pacman.log 2>/dev/null | tail -1 | cut -c2-11)"
+      "$(grep -a 'Commandline: apt-get full-upgrade' -B1 /var/log/apt/history.log 2>/dev/null | grep '^Start-Date' | tail -1 | cut -c13-22)"
   """) every 5m json optional
 
   let host = lower(replace(dev.model ?? "phone", " ", "-"))
@@ -39,7 +39,7 @@ widget "fetch" {
 
   onTap: screen()
 
-  // Arch's A with its rounded cut, or Android's head, in the accent color.
+  // The Linux logo, or Android's head, in the accent color.
   component Logo(arch) {
     Canvas {
       if arch {
@@ -114,7 +114,7 @@ widget "fetch" {
     Line { key: "host"; value: dev == null ? null : "${dev.maker} ${dev.model}" }
     Line { key: "kernel"; value: kernel }
     Line { key: "uptime"; value: sys.uptime == null ? null : fmtDuration(sys.uptime) }
-    Line { key: "packages"; value: linux ? (lx.pkgs == null ? null : "${lx.pkgs} (pacman), ${sys.apps} (apps)") : "${sys.apps} (apps)" }
+    Line { key: "packages"; value: linux ? (lx.pkgs == null ? null : "${lx.pkgs} (dpkg), ${sys.apps} (apps)") : "${sys.apps} (apps)" }
     if linux {
       Line { key: "shell"; value: lx.shell }
     } else {
@@ -187,15 +187,15 @@ widget "fetch" {
       Heading { label: "linux" }
       if linux {
         Line { key: "os"; value: lx.os; size: 13; keyWidth: 110 }
-        Line { key: "packages"; value: lx.pkgs == null ? null : "${lx.pkgs} (${lx.explicit} explicit)"; size: 13; keyWidth: 110 }
+        Line { key: "packages"; value: lx.pkgs == null ? null : "${lx.pkgs} (${lx.explicit} manual)"; size: 13; keyWidth: 110 }
         Line { key: "shell"; value: lx.shell; size: 13; keyWidth: 110 }
         Line { key: "upgraded"; value: lx.upgraded == "" ? "never" : lx.upgraded; size: 13; keyWidth: 110 }
         Row {
           justify: end
-          Button { text: "fastfetch ↗"; color: muted; onTap: terminal("command -v fastfetch >/dev/null || pacman -S --needed --noconfirm fastfetch; fastfetch", "fastfetch") }
+          Button { text: "fastfetch ↗"; color: muted; onTap: terminal("command -v fastfetch >/dev/null || apt-get install -y fastfetch; fastfetch", "fastfetch") }
         }
       } else {
-        Text { text: "not installed. arch linux arm adds a terminal, agents and pacman to the launcher."; style: small; color: muted }
+        Text { text: "not installed. debian arm adds a terminal, hyprland, agents and apt to the launcher."; style: small; color: muted }
         Row {
           justify: end
           Button { text: "install linux"; color: accent; onTap: launcher("linux") }

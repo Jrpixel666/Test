@@ -4,7 +4,7 @@ widget "memory" {
   size: 3x4
   minSize: 2x2
 
-  requires { pacman: ["procps-ng", "gawk", "btop"] }
+  requires { apt: ["procps", "gawk", "btop"] }
 
   source mem = cmd("free -b | awk '/Mem:/ {print $2, $3}'") every 5s
   let total = num(words(mem)[0])

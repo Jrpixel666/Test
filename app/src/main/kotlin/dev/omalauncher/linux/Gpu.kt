@@ -26,16 +26,17 @@ import java.io.FileNotFoundException
 class Gpu(
     private val context: Context,
     private val proot: Proot,
-    private val pacman: Pacman,
+    private val apt: Apt,
 ) {
     private val prefs = LauncherData.prefs(context)
 
     /** The pinned driver for this phone, or null when we have none. */
-    private val spec: GpuDriver? = gpuKind(
-        File("/dev/mali0").exists(),
-        File("/dev/kgsl-3d0").exists(),
-        runCatching { File("/sys/class/kgsl/kgsl-3d0/gpu_model").readText() }.getOrNull(),
-    )?.let(GpuDrivers::of)
+    /**
+     * None on Debian yet: the pinned drivers and the patched Mesa are Arch Linux builds, linked against
+     * Arch's libraries, which Debian can't load. Linux apps render in software (llvmpipe, lavapipe), and
+     * settings doesn't offer the switch while [supported] is false.
+     */
+    private val spec: GpuDriver? = null
 
     /** The phone has a GPU we have a driver for. */
     val supported = spec != null
@@ -75,7 +76,7 @@ class Gpu(
         val mesaCurrent = runCatching { proot.hostFile(GpuDrivers.MESA_ZINK_STAMP).readText().trim() }
             .getOrNull() == GpuDrivers.MESA_ZINK_TAR_SHA256
         if (mesaCurrent && prefs.getString(CHECKED_BUILD, null) == build) {
-            // An older install wrote Mali's manifest on pacman's path. The env now
+            // An older install wrote Mali's manifest on the package manager's path. The env now
             // names the /usr/local file, so that file has to exist before we activate.
             if (!proot.hostFile(driver.icdPath).isFile) {
                 retireLegacyManifest(driver)
@@ -113,8 +114,8 @@ class Gpu(
         stageMesaBundle()
         retireLegacyManifest(driver)
         val script = GpuDrivers.installScript(driver) + " && " + GpuDrivers.probeScript(driver)
-        // The install script runs pacman.
-        if (run("installing", script, pacman.lock)) {
+        // The install script runs apt.
+        if (run("installing", script, apt.lock)) {
             activate(driver)
         } else {
             // Nothing to come back to on the next start; the failure stays on screen.

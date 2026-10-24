@@ -7,7 +7,7 @@ import dev.omalauncher.widgets.lang.OwlKind
 
 /** What agents are told about dependencies when they write or change a widget. */
 private const val DEPENDENCIES =
-    "Declare every package the file's commands need in requires { pacman: [...] } and install them with pacman -S --needed."
+    "Declare every package the file's commands need in requires { apt: [...] } (Debian package names) and install them with apt-get install -y."
 
 /** How agents see their work: they can't see the phone. */
 private const val CHECK =
@@ -92,7 +92,7 @@ fun publishWidgetCommand(
         }
     val prompt =
         "Publish my $what $file to the store at https://github.com/${Market.REPO}. " +
-            "Use the GitHub CLI: install github-cli with pacman and run gh auth login if needed. Read the repo's README for the rules, " +
+            "Use the GitHub CLI: install gh with apt and run gh auth login if needed. Read the repo's README for the rules, " +
             "then fork it and add $place. Its meta needs a description, a version and a license (ask me which license; " +
             "suggest MIT), and it should declare its packages in requires. Leave out anything personal: tokens, paths to my files, my " +
             "location. Show me the final file before pushing, then open the pull request, titled \"Add ${spec.kind.word}: ${spec.name}\", and give me " +
@@ -139,7 +139,7 @@ fun reviewSharedWidgetCommand(
     return agentCommand(agentBin, prompt, readOnly = true)
 }
 
-/** A widget whose declared packages failed to install: the agent gets pacman's output. */
+/** A widget whose declared packages failed to install: the agent gets apt's output. */
 fun fixDependenciesCommand(
     agentBin: String,
     spec: WidgetSpec,
@@ -148,7 +148,7 @@ fun fixDependenciesCommand(
     agentBin,
     spec,
     "installing its requirements (${spec.program?.requires.orEmpty().entries.joinToString { (m, p) -> "$m: ${p.joinToString(" ")}" }}) failed. " +
-        "The last lines from pacman were:\n$log\n",
+        "The last lines from apt were:\n$log\n",
 )
 
 /** A terminal tile that opens straight into [agent] in the home directory, and falls back to a shell when it exits. */

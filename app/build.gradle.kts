@@ -18,11 +18,11 @@ android {
     ndkVersion = prootNdk
 
     defaultConfig {
-        applicationId = "dev.omalauncher"
+        applicationId = "dev.debianarm.launcher"
         minSdk = 29
         targetSdk = 37
-        versionCode = 22
-        versionName = "0.12.1"
+        versionCode = 1
+        versionName = "1.0.0"
         ndk { abiFilters += "arm64-v8a" }
     }
 
@@ -44,6 +44,14 @@ android {
     testOptions { unitTests.isReturnDefaultValues = true }
 
     signingConfigs {
+        // Public on purpose: every CI build signs with it, so each APK installs over the one before.
+        // Not a secret; anyone can sign with it. Put your own key in keystore.properties for a private one.
+        create("publicTest") {
+            storeFile = rootProject.file("signing/public-test.jks")
+            storePassword = "android"
+            keyAlias = "launcher"
+            keyPassword = "android"
+        }
         create("release") {
             uploadKey?.let {
                 storeFile = rootProject.file(it.getProperty("storeFile"))
@@ -55,11 +63,14 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("publicTest")
+        }
         release {
             // Shrinks the APK and drops what the app doesn't use, like the owl module's unused parts.
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
-            signingConfig = signingConfigs.getByName(if (uploadKey != null) "release" else "debug")
+            signingConfig = signingConfigs.getByName(if (uploadKey != null) "release" else "publicTest")
         }
     }
 }
