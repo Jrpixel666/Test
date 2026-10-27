@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Read-only inspection of the current connection for the security tools' man-in-the-middle
+         self-test (proxy, VPN, captive portal, private DNS). A normal permission, granted at install. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Android 17+: widgets and Linux reaching 192.168.x and other local addresses. Asked for
          from a row in settings (LocalNetwork.kt). -->
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />

@@ -43,6 +43,9 @@ enum class SettingsPage {
     Licenses,
     Gestures,
 
+    /** The security tools database and the man-in-the-middle self-test, from settings and the home menu. */
+    Security,
+
     /** Themes and Hyprland's look, from the Debian install. */
     Tweaks,
 }
@@ -119,6 +122,7 @@ private fun SettingsPage(
                 onTweaks = { stack.push(SettingsPage.Tweaks) },
                 onLicenses = { stack.push(SettingsPage.Licenses) },
                 onGestures = { stack.push(SettingsPage.Gestures) },
+                onSecurity = { stack.push(SettingsPage.Security) },
             )
         SettingsPage.Style -> StyleScreen(runtime, onDismiss = close, onBrowse = { stack.push(SettingsPage.Themes) }, onAgent = ::agent)
         SettingsPage.Pages -> {
@@ -166,6 +170,7 @@ private fun SettingsPage(
         SettingsPage.Linux -> LinuxScreen(runtime, onDismiss = close)
         SettingsPage.Licenses -> LicensesScreen(onDismiss = close)
         SettingsPage.Gestures -> GesturesScreen(runtime, onDismiss = close, onAgent = ::agent)
+        SettingsPage.Security -> SecurityScreen(runtime, onDismiss = close)
         SettingsPage.Tweaks -> if (linuxInstalled) TweaksScreen(runtime, onDismiss = close) else LinuxScreen(runtime, onDismiss = close)
     }
 }

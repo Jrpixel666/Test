@@ -102,6 +102,10 @@ fun HomeMenu(
             state.homeMenuOpen = false
             state.show(SettingsPage.Store)
         }
+        MenuItem("security tools") {
+            state.homeMenuOpen = false
+            state.show(SettingsPage.Security)
+        }
         Box(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
             ThemeStrip(
                 runtime.themes,

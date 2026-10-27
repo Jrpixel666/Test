@@ -51,6 +51,7 @@ fun SettingsScreen(
     onTweaks: () -> Unit,
     onLicenses: () -> Unit,
     onGestures: () -> Unit,
+    onSecurity: () -> Unit,
 ) {
     val context = LocalContext.current
     val linux by runtime.bootstrap.state.collectAsState()
@@ -99,6 +100,7 @@ fun SettingsScreen(
                 Triple("android settings", "the phone's system settings") {
                     context.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 },
+                Triple("security tools", "network, wifi, bluetooth and vpn kit · man-in-the-middle self-test", onSecurity),
                 Triple("licenses", "open source software in this launcher", onLicenses),
             )
         UpdatesBox(runtime, installed)
